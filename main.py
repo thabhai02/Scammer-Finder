@@ -446,7 +446,7 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
         scam_type = data.split('_')[2]
         user_state[user_id] = {'action': 'awaiting_id', 'type': scam_type}
         await query.edit_message_text(
-            f"Okay, please send me the **{scam_type.upper()}** of the scammer. 📝\n\n"
+            f"Okay, please send me the {scam_type.upper()} of the scammer. 📝\n\n"
             "⚠️ Note: Some protected identifiers cannot be reported."
         )
     elif data == 'check_scammer':
@@ -466,7 +466,7 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
         scam_type = data.split('_')[2]
         user_state[user_id] = {'action': 'awaiting_check_id', 'type': scam_type}
         await query.edit_message_text(
-            f"Please send me the **{scam_type.upper()}** you want to check. 🔎"
+            f"Please send me the {scam_type.upper()} you want to check. 🔎"
         )
     elif data == 'my_reports':
         await handle_my_reports(update, context)
@@ -829,7 +829,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'identifier': identifier
         }
         await update.message.reply_text(
-            f"Got it! Now, please tell me the **story of the scam**. 📝\n\n"
+            f"Got it! Now, please tell me the story of the scam. 📝\n\n"
             "Include details like:\n"
             "- How they contacted you\n"
             "- What they promised\n"
@@ -998,7 +998,7 @@ async def handle_media_callback(update: Update, context: ContextTypes.DEFAULT_TY
         state = user_state[user_id]
         if add_report(user_id, state['type'], state['identifier'], state['story'], state.get('proof')):
             await query.edit_message_text(
-                f"✅ Report for **{state['identifier']}** saved with {len(state.get('proof', []))} proof item(s)!\n"
+                f"✅ Report for {state['identifier']} saved with {len(state.get('proof', []))} proof item(s)!\n"
                 "Thank you for helping fight scams! 💪"
             )
         else:
@@ -1017,7 +1017,7 @@ async def handle_media_callback(update: Update, context: ContextTypes.DEFAULT_TY
         state = user_state[user_id]
         if add_report(user_id, state['type'], state['identifier'], state['story']):
             await query.edit_message_text(
-                f"✅ Report for **{state['identifier']}** saved!\n"
+                f"✅ Report for {state['identifier']} saved!\n"
                 "Thank you for helping fight scams! 💪"
             )
         else:
@@ -1049,10 +1049,10 @@ async def handle_check_result(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         response = (
             f"{risk_stars}\n"
-            f"🚨 **WARNING!** The {state['type'].upper()} `{check_id}` "
+            f"🚨 WARNING! The {state['type'].upper()} `{check_id}` "
             f"has {len(reports)} scam reports! 🚨\n\n"
-            f"**Risk Level:** {risk_level}\n\n"
-            "**Recent Reports:**\n"
+            f"Risk Level: {risk_level}\n\n"
+            "Recent Reports:\n"
         )
 
         # Show most recent 3 reports
@@ -1069,7 +1069,7 @@ async def handle_check_result(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
     else:
         response = (
-            f"✅ The {state['type'].upper()} `{check_id}` has **not** been reported.\n"
+            f"✅ The {state['type'].upper()} `{check_id}` has not been reported.\n"
             "However, always stay vigilant for new scams!"
         )
 
