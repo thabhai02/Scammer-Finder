@@ -8,6 +8,8 @@ from collections import Counter
 from threading import Thread
 from datetime import datetime
 from flask import Flask
+import firebase_admin
+from firebase_admin import credentials, db
 from telegram import (
     InlineKeyboardButton, 
     InlineKeyboardMarkup, 
@@ -30,6 +32,40 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# --- Firebase Initialization ---
+def initialize_firebase():
+    # Create a temporary file for Firebase credentials
+    with open("temp_firebase_creds.json", "w") as f:
+        json.dump({
+            "type": "service_account",
+            "project_id": "scam-safety-bot",
+            "private_key_id": "552b226867dcada2694a1fe9ee90e21352d1e20e",
+            "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCKLh6Q68D3T/XI\nmrlQb/gu6zHicenr76/5LtqS8ej5hFdMWgluV9eL5uI1H4C4QKNiNHCefl55PCFj\nGmpe8ShU6Up50TaMozD0YrbD/X5KaPardU//PYjjtHB1GcyhIoJUmh2OFVJxVod/\noiE31MPGITGYtx9KlqtQVTzqlwm3z1T1x/YJ8oJCahsWfjgZcJNPr/EhEIJp56Gd\nMVbT2Nw01YI3eAHqzaKRgiZB+LirE/dgVWb3e1GAhbctP9UVRD5W3kqXLAjYRgAZ\nTH2lLkfV9CMJTk+W2OLEt+p/2pcJaefGwK5v88Vey1fTR09XR52S2lBLZJOcGoQ2\nnkiUoGT9AgMBAAECggEAGHdaCib0H9YUmtRqg4eP1h7m0kWBOblS2zgkk2gp7CQ2\noNpAWT1MeQUEgIt3ayhmxXiriCSv7Z9r+fQvaWgh0AcOnMsicXxjqqHf4ov71IkJ\nRAqdg4ANwOOuFc3foZhOo1Q2b3XvBwpfK4Y1g4E0uNwfv/6Ml9RduPeetZrQqa7V\nomn/byo7iugRdK5Wk/ry8oeSY5wIVPjL4mMvZeTmOwesbxGQQ6uKGFVpPXhXDueo\nzWjVL43zqiBNQiJxNin15zYKEyRseIF6cMGoIbSelojUVE9TjJFpAbvuM2dSVhgZ\npuUYR909KpcxtkZqDheMYv0CzKVtJNj+q55tUpN5MQKBgQDDBVtMmB7zl6e7b5Rs\nsswFlekMx0RT4di42XMkFK5gb1R59BJjZt4PTYeK2ExHpUEiFzBwMMNnorNt5v/0\n9l9Lr3En+RxEu6GCUNJkk2gcttqGIRf4hffWcJrTkE0KUwb5Iy6I2wHMi4dvQaoq\nFU/vvBQlPwrMe2/zO3HAdOf9hwKBgQC1YuML5qBnSNC/6UdDRnzd6H3N9Fmj9sgH\nffYbP+jTfTBjRaWzOdBiu70nTnWKitZ1KbFkuLTXmRQ4Gd5g8hV7O2pIctq9NU7q\noPDbT8tHu06sacOfyFH3srEqt6j0omOkzLiNP8E83cIuVqnB4dU1ao3ql69sttAU\nzmjIWC4KWwKBgHrPBr1nFiajm9am3zrMJTpnOsj3OwnvsQBGvwE7nMvRj8r0bhf2\nkWPlmLNQnkiHwkpre+9KZeL/TCqrSwfBliUdKA7aCnkmBwD/UF5RjUB3zYilkmjI\nRFfftUABIOKdgkilZQp9j9Z1DyZ6nWO+5AW91JnX5z75hHgROQLPG8BFAoGBAIvy\nySVUguxNxSpdDau9hfgdOnuejU8xx/Hn4OvzamtKyvu9L/TRpZOYMIBUS+Jh7sel\nLIZ+8KDsLip+4xI/lg1nsUBGxbh4mfPzywIbVcd5oGDslZABmiSYDZPc8pIVfPYZ\nMkdhKnIQ05K3MPEzkjJNjUO0Vxh1EKUNANGbH6LDAoGADGZoNg721ei4FZ+9fmOD\n9QXEQxmyh/4txjcInYknxIMOAuo1BMGKXze/V70k6cAyHKmHU7SLdHT0YcjQ7pzh\n6Su0P+9+2BD4OebH7my3exs3nwlwxpdbeVHE7jwQRVEFBJT4YsdbgJLOFDUzNZV+\nEs9SA2vbTBbofcrk8QEOAX0=\n-----END PRIVATE KEY-----\n",
+            "client_email": "firebase-adminsdk-fbsvc@scam-safety-bot.iam.gserviceaccount.com",
+            "client_id": "100808383445508811606",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40scam-safety-bot.iam.gserviceaccount.com",
+            "universe_domain": "googleapis.com"
+        }, f)
+    
+    # Initialize Firebase
+    cred = credentials.Certificate("temp_firebase_creds.json")
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': 'https://scam-safety-bot-default-rtdb.firebaseio.com/'
+    })
+    logger.info("Firebase initialized successfully")
+
+# Initialize Firebase
+initialize_firebase()
+
+# --- Firebase Database References ---
+SCAM_REPORTS_REF = db.reference('scamReports')
+SCAMMER_INFO_REF = db.reference('scammerInfo')
+ANALYTICS_REF = db.reference('analytics')
+BLACKLIST_REF = db.reference('blacklist')
+
 # --- Configuration ---
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8201226423:AAEcdcAM3KOSfnoEwnwhr-5lqIkqbFuf1QU')
 ADMIN_USER_IDS = [int(x) for x in os.environ.get('ADMIN_USER_IDS', '6103934030').split(',') if x]
@@ -41,17 +77,6 @@ PROTECTED_IDENTIFIERS = {
     'telegram': ['@trendhiveacademy'],
     'instagram': ['@trendhiveacademy']
 }
-
-# File paths for storing data
-SCAM_FILES = {
-    'upi': 'scam_upi.json',
-    'phone': 'scam_phone.json',
-    'telegram': 'scam_telegram.json',
-    'instagram': 'scam_instagram.json',
-}
-SCAMMER_INFO_FILE = 'scammer_info.json'
-ANALYTICS_FILE = 'analytics.json'
-BLACKLIST_FILE = 'blacklist.json'
 
 # Analytics counters
 analytics_data = {
@@ -88,27 +113,44 @@ STOP_WORDS = {
 user_state = {}
 user_reports = {}  # Stores user's reports for management
 
-# --- Helper Functions ---
-
-def load_data(filename: str) -> dict:
-    """Load JSON data from file."""
+# --- Firebase Helper Functions ---
+def firebase_get(path_ref):
+    """Get data from Firebase reference."""
     try:
-        if os.path.exists(filename):
-            with open(filename, 'r', encoding='utf-8') as f:
-                return json.load(f)
-    except (IOError, json.JSONDecodeError) as e:
-        logger.error(f"Error loading {filename}: {e}")
-    return {}
+        data = path_ref.get()
+        return data if data is not None else {}
+    except Exception as e:
+        logger.error(f"Firebase read error: {e}")
+        return {}
 
-def save_data(filename: str, data: dict):
-    """Save JSON data to file."""
+def firebase_set(path_ref, data):
+    """Save data to Firebase reference."""
     try:
-        with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        logger.info(f"Saved data to {filename}")
+        path_ref.set(data)
+        logger.info(f"Firebase data saved to {path_ref.path}")
         return True
-    except IOError as e:
-        logger.error(f"Error saving to {filename}: {e}")
+    except Exception as e:
+        logger.error(f"Firebase write error: {e}")
+        return False
+
+def firebase_update(path_ref, updates):
+    """Update specific fields in Firebase."""
+    try:
+        path_ref.update(updates)
+        logger.info(f"Firebase data updated at {path_ref.path}")
+        return True
+    except Exception as e:
+        logger.error(f"Firebase update error: {e}")
+        return False
+
+def firebase_delete(path_ref):
+    """Delete data from Firebase."""
+    try:
+        path_ref.delete()
+        logger.info(f"Firebase data deleted at {path_ref.path}")
+        return True
+    except Exception as e:
+        logger.error(f"Firebase delete error: {e}")
         return False
 
 def is_protected_identifier(scam_type: str, identifier: str) -> bool:
@@ -118,29 +160,32 @@ def is_protected_identifier(scam_type: str, identifier: str) -> bool:
     return any(protected_id.lower() in identifier for protected_id in protected_list)
 
 def update_analytics(event_type: str, user_id: int = None, story: str = None, scam_type: str = None):
-    """Update analytics data."""
+    """Update analytics data in Firebase."""
     global analytics_data
-
+    
     # Load existing analytics
-    analytics_data = load_data(ANALYTICS_FILE) or analytics_data
-
-    # Update counts
+    analytics_data = firebase_get(ANALYTICS_REF) or analytics_data
     today = datetime.now().strftime('%Y-%m-%d')
 
     if event_type == 'report':
-        analytics_data['total_reports'] += 1
-        analytics_data['report_types'][scam_type] = analytics_data['report_types'].get(scam_type, 0) + 1
-
+        # Update analytics data
+        updates = {
+            'total_reports': analytics_data.get('total_reports', 0) + 1,
+            f'report_types/{scam_type}': analytics_data.get('report_types', {}).get(scam_type, 0) + 1
+        }
+        
         # Reset daily counter if new day
         if analytics_data.get('last_report_date') != today:
-            analytics_data['reports_today'] = 0
-        analytics_data['reports_today'] += 1
-        analytics_data['last_report_date'] = today
-
+            updates['reports_today'] = 1
+        else:
+            updates['reports_today'] = analytics_data.get('reports_today', 0) + 1
+            
+        updates['last_report_date'] = today
+        
         # Update user activity
-        user_activity = analytics_data['user_activity'].get(str(user_id), {})
+        user_activity = analytics_data.get('user_activity', {}).get(str(user_id), {})
         user_activity['reports'] = user_activity.get('reports', 0) + 1
-        analytics_data['user_activity'][str(user_id)] = user_activity
+        updates[f'user_activity/{user_id}'] = user_activity
 
         # Update keywords
         if story:
@@ -150,26 +195,42 @@ def update_analytics(event_type: str, user_id: int = None, story: str = None, sc
             words = clean_story.split()
 
             # Count relevant keywords
+            top_keywords = analytics_data.get('top_keywords', {})
             for word in words:
                 if word not in STOP_WORDS and len(word) > 3:
-                    analytics_data['top_keywords'][word] = analytics_data['top_keywords'].get(word, 0) + 1
+                    top_keywords[word] = top_keywords.get(word, 0) + 1
+            updates['top_keywords'] = top_keywords
+
+        # Save to Firebase
+        firebase_update(ANALYTICS_REF, updates)
+        
+        # Update local copy
+        analytics_data.update(updates)
 
     elif event_type == 'check':
-        analytics_data['total_checks'] += 1
-
+        # Update analytics data
+        updates = {
+            'total_checks': analytics_data.get('total_checks', 0) + 1
+        }
+        
         # Reset daily counter if new day
         if analytics_data.get('last_check_date') != today:
-            analytics_data['checks_today'] = 0
-        analytics_data['checks_today'] += 1
-        analytics_data['last_check_date'] = today
-
+            updates['checks_today'] = 1
+        else:
+            updates['checks_today'] = analytics_data.get('checks_today', 0) + 1
+            
+        updates['last_check_date'] = today
+        
         # Update user activity
-        user_activity = analytics_data['user_activity'].get(str(user_id), {})
+        user_activity = analytics_data.get('user_activity', {}).get(str(user_id), {})
         user_activity['checks'] = user_activity.get('checks', 0) + 1
-        analytics_data['user_activity'][str(user_id)] = user_activity
+        updates[f'user_activity/{user_id}'] = user_activity
 
-    # Save updated analytics
-    save_data(ANALYTICS_FILE, analytics_data)
+        # Save to Firebase
+        firebase_update(ANALYTICS_REF, updates)
+        
+        # Update local copy
+        analytics_data.update(updates)
 
 def get_reputation_score(reports: list) -> tuple:
     """Calculate reputation score based on reports."""
@@ -188,8 +249,9 @@ def get_reputation_score(reports: list) -> tuple:
         return 4, "🚨🚨🚨🚨 Severe Risk"
 
 def add_report(user_id: int, scam_type: str, identifier: str, story: str, proof: list = None) -> bool:
-    """Add a new scam report."""
+    """Add a new scam report to Firebase."""
     timestamp = int(time.time())
+    report_key = f"{scam_type}_{identifier}_{timestamp}_{user_id}"
     report = {
         'user_id': user_id,
         'scam_type': scam_type,
@@ -199,167 +261,169 @@ def add_report(user_id: int, scam_type: str, identifier: str, story: str, proof:
         'proof': proof or []
     }
 
-    # Save to specific scam type file
-    specific_file = SCAM_FILES.get(scam_type)
-    if specific_file:
-        data = load_data(specific_file)
-        if identifier not in data:
-            data[identifier] = []
-        data[identifier].append(report)
-        if not save_data(specific_file, data):
-            return False
+    # Save to scamReports
+    scam_type_ref = SCAM_REPORTS_REF.child(scam_type)
+    scam_type_data = firebase_get(scam_type_ref) or {}
+    
+    if identifier not in scam_type_data:
+        scam_type_data[identifier] = []
+    
+    scam_type_data[identifier].append(report)
+    firebase_set(scam_type_ref, scam_type_data)
 
-    # Save to general scammer info file
-    general_data = load_data(SCAMMER_INFO_FILE)
-    key = f"{scam_type}_{identifier}_{timestamp}_{user_id}"
-    general_data[key] = report
+    # Save to scammerInfo
+    scammer_info_data = firebase_get(SCAMMER_INFO_REF) or {}
+    scammer_info_data[report_key] = report
+    firebase_set(SCAMMER_INFO_REF, scammer_info_data)
 
     # Update analytics
     update_analytics('report', user_id, story, scam_type)
 
-    return save_data(SCAMMER_INFO_FILE, general_data)
+    return True
 
 def get_report(report_key: str) -> dict:
     """Get a specific report by its key."""
-    general_data = load_data(SCAMMER_INFO_FILE)
-    return general_data.get(report_key)
+    scammer_info_data = firebase_get(SCAMMER_INFO_REF) or {}
+    return scammer_info_data.get(report_key)
 
 def update_report(report_key: str, new_data: dict) -> bool:
-    """Update an existing report."""
-    general_data = load_data(SCAMMER_INFO_FILE)
-
-    if report_key not in general_data:
+    """Update an existing report in Firebase."""
+    # Update scammerInfo
+    scammer_info_data = firebase_get(SCAMMER_INFO_REF) or {}
+    
+    if report_key not in scammer_info_data:
         return False
-
+        
     # Update the report
-    report = general_data[report_key]
+    report = scammer_info_data[report_key]
     for field, value in new_data.items():
         if field in report:
             report[field] = value
+            
+    scammer_info_data[report_key] = report
+    firebase_set(SCAMMER_INFO_REF, scammer_info_data)
 
-    # Save updated data
-    general_data[report_key] = report
-
-    # Also update specific scam file
+    # Also update scamReports
     scam_type = report['scam_type']
     identifier = report['identifier']
-    specific_file = SCAM_FILES.get(scam_type)
-
-    if specific_file:
-        data = load_data(specific_file)
-        if identifier in data:
-            # Find and update the matching report
-            for i, r in enumerate(data[identifier]):
-                if (r['user_id'] == report['user_id'] and 
-                    r['timestamp'] == report['timestamp']):
-                    data[identifier][i] = report
-                    save_data(specific_file, data)
-                    break
-
-    return save_data(SCAMMER_INFO_FILE, general_data)
+    scam_type_ref = SCAM_REPORTS_REF.child(scam_type)
+    scam_type_data = firebase_get(scam_type_ref) or {}
+    
+    if identifier in scam_type_data:
+        # Find and update the matching report
+        for i, r in enumerate(scam_type_data[identifier]):
+            if (r['user_id'] == report['user_id'] and 
+                r['timestamp'] == report['timestamp']):
+                scam_type_data[identifier][i] = report
+                firebase_set(scam_type_ref, scam_type_data)
+                break
+    
+    return True
 
 def get_user_reports(user_id: int) -> dict:
-    """Get all reports submitted by a user."""
+    """Get all reports submitted by a user from Firebase."""
+    scammer_info_data = firebase_get(SCAMMER_INFO_REF) or {}
     user_reports = {}
-    general_data = load_data(SCAMMER_INFO_FILE)
-
-    for key, report in general_data.items():
+    
+    for key, report in scammer_info_data.items():
         if report.get('user_id') == user_id:
             user_reports[key] = report
-
+            
     return user_reports
 
 def get_all_reports() -> dict:
-    """Get all reports in the system."""
-    return load_data(SCAMMER_INFO_FILE) or {}
+    """Get all reports in the system from Firebase."""
+    return firebase_get(SCAMMER_INFO_REF) or {}
 
 def delete_report(report_key: str) -> bool:
-    """Delete a report from all files."""
+    """Delete a report from Firebase."""
     # Load the report to get details
-    general_data = load_data(SCAMMER_INFO_FILE)
-    report = general_data.get(report_key)
+    scammer_info_data = firebase_get(SCAMMER_INFO_REF) or {}
+    report = scammer_info_data.get(report_key)
     if not report:
         return False
 
-    # Delete from specific file
+    # Delete from scamReports
     scam_type = report['scam_type']
     identifier = report['identifier']
-    specific_file = SCAM_FILES.get(scam_type)
-    if specific_file:
-        data = load_data(specific_file)
-        if identifier in data:
-            # Remove all reports for this identifier by this user
-            data[identifier] = [r for r in data[identifier] if r['user_id'] != report['user_id']]
-            if not data[identifier]:  # If no more reports, remove identifier
-                del data[identifier]
-            save_data(specific_file, data)
+    scam_type_ref = SCAM_REPORTS_REF.child(scam_type)
+    scam_type_data = firebase_get(scam_type_ref) or {}
+    
+    if identifier in scam_type_data:
+        # Remove all reports for this identifier by this user
+        scam_type_data[identifier] = [
+            r for r in scam_type_data[identifier] 
+            if r['user_id'] != report['user_id']
+        ]
+        
+        # If no more reports, remove identifier
+        if not scam_type_data[identifier]:
+            del scam_type_data[identifier]
+            
+        firebase_set(scam_type_ref, scam_type_data)
 
-    # Delete from general file
-    if report_key in general_data:
-        del general_data[report_key]
-        return save_data(SCAMMER_INFO_FILE, general_data)
+    # Delete from scammerInfo
+    if report_key in scammer_info_data:
+        del scammer_info_data[report_key]
+        firebase_set(SCAMMER_INFO_REF, scammer_info_data)
 
-    return False
+    return True
 
 def clear_all_data():
-    """Clear all scam data files."""
-    for file in list(SCAM_FILES.values()) + [SCAMMER_INFO_FILE]:
-        try:
-            if os.path.exists(file):
-                os.remove(file)
-                logger.info(f"Deleted {file}")
-        except OSError as e:
-            logger.error(f"Error deleting {file}: {e}")
+    """Clear all scam data from Firebase."""
+    firebase_set(SCAM_REPORTS_REF, {})
+    firebase_set(SCAMMER_INFO_REF, {})
+    firebase_set(ANALYTICS_REF, analytics_data)  # Reset analytics
+    firebase_set(BLACKLIST_REF, {})
     return True
 
 def search_reports(scam_type: str, search_id: str) -> list:
-    """Search for reports matching an identifier."""
-    specific_file = SCAM_FILES.get(scam_type)
-    if not specific_file:
-        return []
-
-    data = load_data(specific_file)
+    """Search for reports matching an identifier in Firebase."""
+    scam_type_ref = SCAM_REPORTS_REF.child(scam_type)
+    scam_type_data = firebase_get(scam_type_ref) or {}
     search_id = search_id.lower().strip()
 
     # Find all matching identifiers (case-insensitive)
     results = []
-    for identifier, reports in data.items():
+    for identifier, reports in scam_type_data.items():
         if search_id in identifier.lower():
             results.extend(reports)
 
     return results
 
 def is_blacklisted(user_id: int) -> bool:
-    """Check if user is blacklisted."""
-    blacklist = load_data(BLACKLIST_FILE) or {}
+    """Check if user is blacklisted in Firebase."""
+    blacklist = firebase_get(BLACKLIST_REF) or {}
     return str(user_id) in blacklist
 
 def blacklist_user(user_id: int, reason: str = "Violation of terms"):
-    """Add user to blacklist."""
-    blacklist = load_data(BLACKLIST_FILE) or {}
+    """Add user to blacklist in Firebase."""
+    blacklist = firebase_get(BLACKLIST_REF) or {}
     blacklist[str(user_id)] = {
         'timestamp': int(time.time()),
         'reason': reason
     }
-    return save_data(BLACKLIST_FILE, blacklist)
+    firebase_set(BLACKLIST_REF, blacklist)
+    return True
 
 def unblacklist_user(user_id: int) -> bool:
-    """Remove user from blacklist."""
-    blacklist = load_data(BLACKLIST_FILE) or {}
+    """Remove user from blacklist in Firebase."""
+    blacklist = firebase_get(BLACKLIST_REF) or {}
     if str(user_id) in blacklist:
         del blacklist[str(user_id)]
-        return save_data(BLACKLIST_FILE, blacklist)
+        firebase_set(BLACKLIST_REF, blacklist)
+        return True
     return False
 
 def get_top_keywords(n=10) -> list:
     """Get top keywords from analytics."""
-    analytics = load_data(ANALYTICS_FILE) or {}
+    analytics = firebase_get(ANALYTICS_REF) or {}
     keywords = analytics.get('top_keywords', {})
     return Counter(keywords).most_common(n)
 
 def get_active_users() -> list:
-    """Get most active users."""
-    analytics = load_data(ANALYTICS_FILE) or {}
+    """Get most active users from analytics."""
+    analytics = firebase_get(ANALYTICS_REF) or {}
     user_activity = analytics.get('user_activity', {})
 
     # Create list of (user_id, total_actions)
@@ -446,7 +510,7 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
         scam_type = data.split('_')[2]
         user_state[user_id] = {'action': 'awaiting_id', 'type': scam_type}
         await query.edit_message_text(
-            f"Okay, please send me the {scam_type.upper()} of the scammer. 📝\n\n"
+            f"Okay, please send me the **{scam_type.upper()}** of the scammer. 📝\n\n"
             "⚠️ Note: Some protected identifiers cannot be reported."
         )
     elif data == 'check_scammer':
@@ -466,7 +530,7 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
         scam_type = data.split('_')[2]
         user_state[user_id] = {'action': 'awaiting_check_id', 'type': scam_type}
         await query.edit_message_text(
-            f"Please send me the {scam_type.upper()} you want to check. 🔎"
+            f"Please send me the **{scam_type.upper()}** you want to check. 🔎"
         )
     elif data == 'my_reports':
         await handle_my_reports(update, context)
@@ -569,10 +633,10 @@ async def show_all_reports(update: Update, context: ContextTypes.DEFAULT_TYPE, p
     """Show all reports to admin with pagination."""
     query = update.callback_query
     user_id = query.from_user.id
-
+    
     # Save current page in state
     user_state[user_id] = {'action': 'admin_view_all_reports', 'page': page}
-
+    
     reports = get_all_reports()
     if not reports:
         keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data='admin_panel_back')]]
@@ -582,24 +646,24 @@ async def show_all_reports(update: Update, context: ContextTypes.DEFAULT_TYPE, p
             reply_markup=reply_markup
         )
         return
-
+    
     # Sort reports by timestamp (newest first)
     sorted_reports = sorted(reports.items(), key=lambda x: x[1].get('timestamp', 0), reverse=True)
-
+    
     # Pagination
     items_per_page = 5
     total_pages = (len(sorted_reports) + items_per_page - 1) // items_per_page
-
+    
     if page >= total_pages:
         page = total_pages - 1
-
+    
     start_idx = page * items_per_page
     end_idx = min(start_idx + items_per_page, len(sorted_reports))
     page_reports = sorted_reports[start_idx:end_idx]
-
+    
     # Format message
     message = f"📋 All Reports (Page {page+1}/{total_pages}):\n\n"
-
+    
     for i, (report_key, report) in enumerate(page_reports, start=1):
         timestamp = time.strftime('%Y-%m-%d %H:%M', time.localtime(report['timestamp']))
         message += (
@@ -610,10 +674,10 @@ async def show_all_reports(update: Update, context: ContextTypes.DEFAULT_TYPE, p
             f"User: {report['user_id']}\n"
             f"Key: `{report_key[:15]}...`\n\n"
         )
-
+    
     # Create keyboard
     keyboard = []
-
+    
     # Add view buttons for each report
     for i, (report_key, _) in enumerate(page_reports, start=1):
         keyboard.append([
@@ -622,20 +686,20 @@ async def show_all_reports(update: Update, context: ContextTypes.DEFAULT_TYPE, p
                 callback_data=f'admin_view_report_{report_key}'
             )
         ])
-
+    
     # Pagination buttons
     nav_buttons = []
     if page > 0:
         nav_buttons.append(InlineKeyboardButton("⬅️ Previous", callback_data=f'admin_report_page_{page-1}'))
     if page < total_pages - 1:
         nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f'admin_report_page_{page+1}'))
-
+    
     if nav_buttons:
         keyboard.append(nav_buttons)
-
+    
     # Add back button
     keyboard.append([InlineKeyboardButton("🔙 Back to Admin", callback_data='admin_panel_back')])
-
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
 
@@ -643,13 +707,13 @@ async def view_report_details(update: Update, context: ContextTypes.DEFAULT_TYPE
     """Show detailed view of a specific report."""
     query = update.callback_query
     report = get_report(report_key)
-
+    
     if not report:
         await query.answer("Report not found!")
         return
-
+    
     timestamp = time.strftime('%Y-%m-%d %H:%M', time.localtime(report['timestamp']))
-
+    
     message = (
         f"🔍 Report Details:\n\n"
         f"🔑 Key: `{report_key}`\n"
@@ -660,7 +724,7 @@ async def view_report_details(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"📖 Story:\n{report['story']}\n\n"
         f"📸 Proof: {len(report.get('proof', []))} items"
     )
-
+    
     keyboard = [
         [
             InlineKeyboardButton("✏️ Edit Report", callback_data=f'admin_edit_report_{report_key}'),
@@ -668,7 +732,7 @@ async def view_report_details(update: Update, context: ContextTypes.DEFAULT_TYPE
         ],
         [InlineKeyboardButton("⬅️ Back to Reports", callback_data='admin_view_all_reports')]
     ]
-
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
 
@@ -676,20 +740,20 @@ async def show_edit_options(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     """Show options for editing a report."""
     query = update.callback_query
     report = get_report(report_key)
-
+    
     if not report:
         await query.answer("Report not found!")
         return
-
+    
     message = "✏️ Select which field to edit:"
-
+    
     keyboard = [
         [InlineKeyboardButton("Edit Scam Type", callback_data=f'admin_edit_field_{report_key}_scam_type')],
         [InlineKeyboardButton("Edit Identifier", callback_data=f'admin_edit_field_{report_key}_identifier')],
         [InlineKeyboardButton("Edit Story", callback_data=f'admin_edit_field_{report_key}_story')],
         [InlineKeyboardButton("⬅️ Back to Report", callback_data=f'admin_view_report_{report_key}')]
     ]
-
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(message, reply_markup=reply_markup)
 
@@ -751,7 +815,7 @@ async def handle_admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def show_analytics(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show bot analytics."""
     query = update.callback_query
-    analytics = load_data(ANALYTICS_FILE) or {}
+    analytics = firebase_get(ANALYTICS_REF) or {}
 
     # Format analytics data
     message = "📊 Bot Analytics:\n\n"
@@ -829,7 +893,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'identifier': identifier
         }
         await update.message.reply_text(
-            f"Got it! Now, please tell me the story of the scam. 📝\n\n"
+            f"Got it! Now, please tell me the **story of the scam**. 📝\n\n"
             "Include details like:\n"
             "- How they contacted you\n"
             "- What they promised\n"
@@ -859,11 +923,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     elif action == 'admin_search_reports':
         search_term = text.strip().lower()
-        general_data = load_data(SCAMMER_INFO_FILE)
+        scammer_info_data = firebase_get(SCAMMER_INFO_REF) or {}
 
         # Find matching reports
         matches = []
-        for key, report in general_data.items():
+        for key, report in scammer_info_data.items():
             if search_term in report['identifier'].lower():
                 matches.append((key, report))
 
@@ -912,7 +976,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         report_key = state.get('report_key')
         field = state.get('field')
         new_value = text.strip()
-
+        
         if update_report(report_key, {field: new_value}):
             await update.message.reply_text(f"✅ {field.upper()} updated successfully!")
             # Show report details again
@@ -928,7 +992,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             await update.message.reply_text("❌ Failed to update report.")
-
+        
         # Clear editing state
         if user_id in user_state:
             del user_state[user_id]
@@ -998,7 +1062,7 @@ async def handle_media_callback(update: Update, context: ContextTypes.DEFAULT_TY
         state = user_state[user_id]
         if add_report(user_id, state['type'], state['identifier'], state['story'], state.get('proof')):
             await query.edit_message_text(
-                f"✅ Report for {state['identifier']} saved with {len(state.get('proof', []))} proof item(s)!\n"
+                f"✅ Report for **{state['identifier']}** saved with {len(state.get('proof', []))} proof item(s)!\n"
                 "Thank you for helping fight scams! 💪"
             )
         else:
@@ -1017,7 +1081,7 @@ async def handle_media_callback(update: Update, context: ContextTypes.DEFAULT_TY
         state = user_state[user_id]
         if add_report(user_id, state['type'], state['identifier'], state['story']):
             await query.edit_message_text(
-                f"✅ Report for {state['identifier']} saved!\n"
+                f"✅ Report for **{state['identifier']}** saved!\n"
                 "Thank you for helping fight scams! 💪"
             )
         else:
@@ -1049,10 +1113,10 @@ async def handle_check_result(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         response = (
             f"{risk_stars}\n"
-            f"🚨 WARNING! The {state['type'].upper()} `{check_id}` "
+            f"🚨 **WARNING!** The {state['type'].upper()} `{check_id}` "
             f"has {len(reports)} scam reports! 🚨\n\n"
-            f"Risk Level: {risk_level}\n\n"
-            "Recent Reports:\n"
+            f"**Risk Level:** {risk_level}\n\n"
+            "**Recent Reports:**\n"
         )
 
         # Show most recent 3 reports
@@ -1069,7 +1133,7 @@ async def handle_check_result(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
     else:
         response = (
-            f"✅ The {state['type'].upper()} `{check_id}` has not been reported.\n"
+            f"✅ The {state['type'].upper()} `{check_id}` has **not** been reported.\n"
             "However, always stay vigilant for new scams!"
         )
 
@@ -1093,11 +1157,6 @@ def run_flask_app():
 
 def main():
     """Starts the bot and web server."""
-    # Initialize data files
-    for file in list(SCAM_FILES.values()) + [SCAMMER_INFO_FILE, ANALYTICS_FILE, BLACKLIST_FILE]:
-        if not os.path.exists(file):
-            save_data(file, {})
-
     # Start Flask in separate thread
     flask_thread = Thread(target=run_flask_app)
     flask_thread.daemon = True
